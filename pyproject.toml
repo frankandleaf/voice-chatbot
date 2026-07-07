@@ -1,0 +1,31 @@
+[project]
+name = "voice-chatbot"
+version = "0.1.0"
+description = "Real-time ASR-LLM-TTS voice chatbot built on Pipecat with SenseVoiceSmall, OpenAI-compatible LLM, and vLLM-Omni TTS"
+requires-python = ">=3.10"
+dependencies = [
+    "pipecat-ai[local]>=0.1.0",
+    "funasr>=1.0.0",
+    "modelscope>=1.9.0",
+    "openai>=1.0.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.26.0",
+    "pydantic>=2.0.0",
+    "pyyaml>=6.0",
+    "python-dotenv>=1.0.0",
+    "loguru>=0.7.0",
+    "torch>=2.0.0",
+]
+
+[project.scripts]
+voice-chatbot = "src.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+include = ["src*"]

@@ -1,0 +1,106 @@
+# =============================================================================
+# Voice Chatbot Configuration
+# =============================================================================
+# Environment variables (${VAR_NAME}) are interpolated at load time.
+# Copy .env.example to .env and fill in your values.
+
+pipeline:
+  sample_rate: 16000
+  channels: 1
+  transport: "local"        # "local" for mic/speaker, "websocket" for network
+  host: "0.0.0.0"           # WebSocket server bind address
+  port: 8765                # WebSocket server port
+  session_timeout: null     # WebSocket only: max session seconds, null=unlimited
+
+vad:
+  provider: "silero"
+  start_secs: 0.2           # Seconds of continuous speech before VAD activates
+  stop_secs: 0.3            # Hangover: silence before end-of-speech (lower=faster)
+  sample_rate: 16000
+
+# ------------------------------------------------------------------
+# Advanced VAD/AED pipeline
+# ------------------------------------------------------------------
+vad_advanced:
+  # Stage 1: fsmn-vad pre-filter (fast, distinguishes speech from noise)
+  fsmn_gate:
+    enabled: true
+    min_speech_score: 0.5   # Score threshold for "likely speech"
+    chunk_ms: 100           # Inference chunk size
+    device: "cpu"           # "cuda" or "cpu"
+
+  # Stage 2: Real-time AED — suppress VAD on non-speech events
+  aed_suppressor:
+    enabled: true
+    suppression_duration_ms: 500   # How long to suppress VAD after an event
+    rms_threshold_ratio: 2.0       # RMS multiplier above noise floor
+    enabled_events:
+      - "music"
+      - "clap"
+      - "bang"
+      - "screech"
+      - "silence"
+
+  # Stage 3: Smart interruption — min words before allowing barge-in
+  smart_interruption:
+    enabled: true
+    min_words: 2            # Minimum transcribed words to allow interruption
+    max_wait_secs: 2.0      # Timeout — forward anyway after this
+
+  # Stage 4: Adaptive noise floor tracking
+  adaptive_noise:
+    enabled: true
+    window_secs: 30.0       # Rolling RMS window
+    percentile: 85.0        # Noise floor percentile
+    update_interval_s: 1.0  # How often to emit NoiseFloorFrame
+
+asr:
+  provider: "sensevoice"
+  model: "iic/SenseVoiceSmall"
+  vad_model: "fsmn-vad"
+  device: "cuda"            # "cuda" or "cpu"
+  use_itn: true             # Inverse text normalization (numbers, dates)
+  sample_rate: 16000
+  enable_interim: true      # Streaming interim ASR results (real-time display)
+  interim_interval_ms: 500  # Interval between interim snapshots
+
+llm:
+  provider: "openai"
+  base_url: "${LLM_BASE_URL}"
+  api_key: "${LLM_API_KEY}"
+  model: "${LLM_MODEL}"
+  temperature: 0.7
+  max_tokens: 512
+  system_prompt: "You are a helpful voice assistant. Keep responses short and conversational. If you hear background sounds like music or laughter, acknowledge them naturally."
+  max_history_rounds: 20
+  supports_vision: true     # Enable multimodal (image + text) input
+
+tts:
+  provider: "vllm-omni"
+  base_url: "${TTS_BASE_URL}"
+  api_key: "${LLM_API_KEY}"
+  model: "${TTS_MODEL}"
+  voice: "firefly"
+  speed: 1.0
+  ref_audio_path: null      # Not needed: voice "firefly" is server-side cloned
+  ref_text: null
+  sample_rate: 24000
+  response_format: "wav"
+
+audio:
+  input_device: null        # null = system default
+  output_device: null
+  input_sample_rate: 16000
+  output_sample_rate: 24000
+  frames_per_buffer: 1600   # ~100ms at 16kHz
+
+aed:
+  enabled: true
+  include_in_context: true  # Inject detected events into LLM prompt
+  event_mappings:
+    BGM: "[Background music playing]"
+    Applause: "[Applause detected]"
+    Laughter: "[Laughter heard]"
+    Coughing: "[Coughing detected]"
+    Sneeze: "[Sneeze heard]"
+    Crying: "[Crying detected]"
