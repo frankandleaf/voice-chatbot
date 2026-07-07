@@ -12,6 +12,7 @@ import asyncio
 import base64
 import io
 import wave
+from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Optional
 
@@ -81,7 +82,57 @@ class VLLMTTSService(TTSService):
         await super().cleanup()
 
     # ------------------------------------------------------------------
-    # Core — called for each aggregated text segment
+    # Core — abstract method implementation
+    # ------------------------------------------------------------------
+
+    async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
+        yield None  # signal base class to create audio context
+
+        body: dict = {
+            "model": self._config.model,
+            "input": text,
+            "voice": self._config.voice,
+            "speed": self._config.speed,
+            "response_format": self._config.response_format,
+        }
+        if self._ref_audio_base64:
+            body["ref_audio"] = self._ref_audio_base64
+        if self._config.ref_text:
+            body["ref_text"] = self._config.ref_text
+
+        try:
+            async with self._client.audio.speech.with_streaming_response.create(
+                **body
+            ) as response:
+                async for chunk_bytes in response.iter_bytes(CHUNK_SIZE_BYTES):
+                    if chunk_bytes:
+                        yield AudioRawFrame(
+                            audio=chunk_bytes,
+                            sample_rate=self._config.sample_rate,
+                            num_channels=1,
+                        )
+        except Exception as exc:
+            logger.warning(f"Streaming TTS failed ({exc}), falling back to batch")
+            try:
+                resp = await self._client.audio.speech.create(**body)
+                if resp.content:
+                    with wave.open(io.BytesIO(resp.content), "rb") as wf:
+                        pcm = wf.readframes(wf.getnframes())
+                    for i in range(0, len(pcm), CHUNK_SIZE_BYTES):
+                        chunk = pcm[i : i + CHUNK_SIZE_BYTES]
+                        if chunk:
+                            yield AudioRawFrame(
+                                audio=chunk,
+                                sample_rate=self._config.sample_rate,
+                                num_channels=1,
+                            )
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc2:
+                logger.error(f"TTS failed (batch): {exc2}")
+
+    # ------------------------------------------------------------------
+    # Legacy process_frame override (backward compat)
     # ------------------------------------------------------------------
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
