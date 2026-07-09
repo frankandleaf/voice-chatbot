@@ -23,15 +23,18 @@ from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
     Frame,
+    LLMFullResponseEndFrame,
+    LLMFullResponseStartFrame,
+    LLMTextFrame,
     StartFrame,
     TTSAudioRawFrame,
-    TextFrame,
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
 from src.config import TtsConfig
 
 CHUNK_DURATION_SECS = 0.020
+SENTENCE_END_CHARS = ".!?;\n\u3002\uff01\uff1f\uff1b"
 
 
 class VLLMTTSService(FrameProcessor):
@@ -42,6 +45,7 @@ class VLLMTTSService(FrameProcessor):
         self._config = config
         self._client: Optional[httpx.AsyncClient] = None
         self._ref_audio_bytes: Optional[bytes] = None
+        self._text_buffer = ""
 
     @property
     def _chunk_size_bytes(self) -> int:
@@ -87,22 +91,53 @@ class VLLMTTSService(FrameProcessor):
             return
 
         if isinstance(frame, EndFrame):
+            await self._flush_text_buffer()
             await self.cleanup()
             await self.push_frame(frame, direction)
             return
 
         if isinstance(frame, CancelFrame):
+            await self._flush_text_buffer()
             await self.cleanup()
             await self.push_frame(frame, direction)
             return
 
-        if isinstance(frame, TextFrame):
-            text = frame.text.strip()
-            if text:
-                await self._synthesize(text)
+        if isinstance(frame, LLMFullResponseStartFrame):
+            self._text_buffer = ""
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, LLMFullResponseEndFrame):
+            await self._flush_text_buffer()
+            await self.push_frame(frame, direction)
+            return
+
+        if isinstance(frame, LLMTextFrame):
+            self._text_buffer += frame.text
+            for sentence in self._pop_complete_sentences():
+                await self._synthesize(sentence)
             return
 
         await self.push_frame(frame, direction)
+
+    def _pop_complete_sentences(self) -> list[str]:
+        sentences = []
+        start = 0
+        for index, char in enumerate(self._text_buffer):
+            if char in SENTENCE_END_CHARS:
+                sentence = self._text_buffer[start:index + 1].strip()
+                if sentence:
+                    sentences.append(sentence)
+                start = index + 1
+
+        self._text_buffer = self._text_buffer[start:].lstrip()
+        return sentences
+
+    async def _flush_text_buffer(self):
+        text = self._text_buffer.strip()
+        self._text_buffer = ""
+        if text:
+            await self._synthesize(text)
 
     async def _synthesize(self, text: str):
         if not self._client:

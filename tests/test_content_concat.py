@@ -26,33 +26,10 @@ class TestContentConcatenator:
         assert cc._speaking is False
         assert len(cc._history) == 0
 
-    def test_system_prompt_stored(self):
-        """Verify system prompt is captured from config."""
-        llm_config = LlmConfig(system_prompt="Hello, world!")
-        cc = ContentConcatenator(llm_config)
-        assert cc._system == {"role": "system", "content": "Hello, world!"}
-
-    def test_history_trimming(self):
-        """Verify conversation history respects max_history_rounds."""
-        llm_config = LlmConfig(max_history_rounds=2)
-        cc = ContentConcatenator(llm_config)
-
-        # Add 5 rounds of conversation directly to history
-        for i in range(5):
-            cc._history.append({"role": "user", "content": f"msg {i}"})
-            cc._history.append({"role": "assistant", "content": f"reply {i}"})
-
-        # Simulate _finalize_turn's trimming logic
-        max_msgs = llm_config.max_history_rounds * 2
-        if len(cc._history) > max_msgs:
-            cc._history = cc._history[-max_msgs:]
-
-        messages = [cc._system] + list(cc._history)
-        # 2 rounds = 4 messages + system prompt = 5 total
-        assert len(messages) == 5
-        assert messages[0] == cc._system
-        assert messages[1]["content"] == "msg 3"  # oldest kept
-        assert messages[4]["content"] == "reply 4"  # newest
+    def test_no_local_history_is_kept(self):
+        """History lives in the upstream LLM service, not this processor."""
+        cc = ContentConcatenator(LlmConfig())
+        assert cc._history == []
 
     def test_aed_disabled(self):
         """When AED is disabled, events should not be collected."""
@@ -108,3 +85,30 @@ class TestContentConcatenator:
         contexts = [frame for frame in pushed if isinstance(frame, LLMContextFrame)]
         assert len(contexts) == 1
         assert contexts[0].context.messages[-1]["content"] == "after stop"
+        assert [message["role"] for message in contexts[0].context.messages] == ["user"]
+
+    @pytest.mark.anyio
+    async def test_every_turn_sends_only_latest_user_message(self):
+        cc = ContentConcatenator(LlmConfig())
+        pushed = []
+
+        async def capture(frame, direction=None):
+            pushed.append(frame)
+
+        cc.push_frame = capture
+
+        await cc.process_frame(
+            TranscriptionFrame(text="first", user_id="user", timestamp="1"),
+            None,
+        )
+        await cc.process_frame(
+            TranscriptionFrame(text="second", user_id="user", timestamp="1"),
+            None,
+        )
+
+        contexts = [frame for frame in pushed if isinstance(frame, LLMContextFrame)]
+        assert [context.context.messages for context in contexts] == [
+            [{"role": "user", "content": "first"}],
+            [{"role": "user", "content": "second"}],
+        ]
+        assert cc._history == []

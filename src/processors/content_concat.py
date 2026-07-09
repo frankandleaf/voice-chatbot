@@ -55,13 +55,9 @@ class ContentConcatenator(FrameProcessor):
         self._latest_image_frame: Optional[InputImageRawFrame] = None
         self._image_sent: bool = False
 
-        # Conversation history (list of OpenAI-format message dicts)
+        # No local conversation history: the upstream LLM service is stateful.
+        # Each request must contain exactly the latest user turn.
         self._history: list[dict] = []
-        self._system = {"role": "system", "content": llm_config.system_prompt}
-
-        # Assistant tracking — accumulates TextFrames from TTS/LLM output.
-        # Saved to history in _finalize_turn() BEFORE being reset.
-        self._assistant_text: str = ""
 
     # ------------------------------------------------------------------
     # Frame processing
@@ -109,14 +105,12 @@ class ContentConcatenator(FrameProcessor):
             await self.push_frame(frame, direction)
 
         elif isinstance(frame, TextFrame):
-            self._assistant_text += frame.text
             await self.push_frame(frame, direction)
 
         elif isinstance(frame, InterruptionFrame):
             self._speaking = False
             self._turn_text = ""
             self._turn_aed = []
-            self._assistant_text = ""
             self._latest_image_frame = None
             self._image_sent = False
             await self.push_frame(frame, direction)
@@ -158,22 +152,7 @@ class ContentConcatenator(FrameProcessor):
         else:
             message = {"role": "user", "content": text}
 
-        self._history.append(message)
-
-        # Save assistant text from previous response
-        if self._assistant_text.strip():
-            self._history.append(
-                {"role": "assistant", "content": self._assistant_text.strip()}
-            )
-        self._assistant_text = ""
-
-        # Trim history to max_history_rounds
-        max_msgs = self._llm.max_history_rounds * 2
-        if len(self._history) > max_msgs:
-            self._history = self._history[-max_msgs:]
-
-        messages = [self._system] + list(self._history)
-        context = LLMContext(messages=messages)
+        context = LLMContext(messages=[message])
         logger.info(f"LLM context <- \"{text[:80]}\"")
         await self.push_frame(LLMContextFrame(context=context))
         self._turn_text = ""

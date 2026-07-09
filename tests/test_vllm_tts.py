@@ -3,6 +3,9 @@
 import io
 import wave
 
+import pytest
+from pipecat.frames.frames import LLMFullResponseEndFrame, LLMTextFrame, TextFrame
+
 from src.config import TtsConfig
 from src.services.vllm_tts import VLLMTTSService
 
@@ -68,3 +71,43 @@ def test_tts_adds_v1_when_base_url_is_server_root():
     service = VLLMTTSService(TtsConfig(base_url="http://localhost:8091"))
 
     assert service._speech_url == "http://localhost:8091/v1/audio/speech"
+
+
+@pytest.mark.anyio
+async def test_tts_synthesizes_complete_sentences_only():
+    service = VLLMTTSService(TtsConfig())
+    synthesized = []
+
+    async def synthesize(text):
+        synthesized.append(text)
+
+    service._synthesize = synthesize
+
+    await service.process_frame(LLMTextFrame("Hello"), None)
+    assert synthesized == []
+
+    await service.process_frame(LLMTextFrame(" world. Next"), None)
+    assert synthesized == ["Hello world."]
+
+    await service.process_frame(LLMFullResponseEndFrame(), None)
+    assert synthesized == ["Hello world.", "Next"]
+
+
+@pytest.mark.anyio
+async def test_tts_ignores_non_llm_text_frames():
+    service = VLLMTTSService(TtsConfig())
+    synthesized = []
+
+    async def synthesize(text):
+        synthesized.append(text)
+
+    service._synthesize = synthesize
+
+    async def capture(frame, direction=None):
+        pass
+
+    service.push_frame = capture
+
+    await service.process_frame(TextFrame("user text"), None)
+
+    assert synthesized == []
