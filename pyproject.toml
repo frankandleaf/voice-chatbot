@@ -4,17 +4,24 @@ version = "0.1.0"
 description = "Real-time ASR-LLM-TTS voice chatbot built on Pipecat with SenseVoiceSmall, OpenAI-compatible LLM, and vLLM-Omni TTS"
 requires-python = ">=3.10"
 dependencies = [
-    "pipecat-ai[local]>=0.1.0",
-    "funasr>=1.0.0",
-    "modelscope>=1.9.0",
-    "openai>=1.0.0",
-    "sounddevice>=0.4.6",
-    "numpy>=1.26.0",
-    "pydantic>=2.0.0",
-    "pyyaml>=6.0",
-    "python-dotenv>=1.0.0",
-    "loguru>=0.7.0",
-    "torch>=2.0.0",
+    "pipecat-ai[local]==1.4.0",
+    "funasr==1.3.14",
+    "modelscope==1.38.0",
+    "openai==2.44.0",
+    "sounddevice==0.5.5",
+    "numpy==2.4.6",
+    "pydantic==2.13.4",
+    "pyyaml==6.0.3",
+    "python-dotenv==1.2.2",
+    "loguru==0.7.3",
+    "torch==2.12.1",
+    "websockets==16.0",
+    "soxr==1.0.0",
+    "audioop-lts==0.2.2",
+    "pyaudio==0.2.14",
+    "pillow==12.3.0",
+    "nltk==3.9.4",
+    "scipy==1.18.0",
 ]
 
 [project.scripts]

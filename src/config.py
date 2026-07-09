@@ -24,7 +24,7 @@ class PipelineConfig(BaseModel):
 
     sample_rate: int = 16000
     channels: int = 1
-    transport: Literal["local", "websocket"] = "local"
+    transport: Literal["local", "websocket", "firefly"] = "firefly"
     host: str = "0.0.0.0"
     port: int = 8765
     session_timeout: int | None = Field(
@@ -182,6 +182,35 @@ class AudioConfig(BaseModel):
     )
 
 
+class FireflyConfig(BaseModel):
+    """Protocol settings for the Firefly Android client adapter."""
+
+    input_sample_rate: int = Field(
+        default=32000,
+        description="Firefly microphone PCM sample rate in Hz",
+    )
+    output_sample_rate: int = Field(
+        default=44100,
+        description="Firefly AudioTrack PCM sample rate in Hz",
+    )
+    input_channels: int = 1
+    output_channels: int = 1
+    image_width: int = 640
+    image_height: int = 480
+    image_format: str = "image/jpeg"
+    max_message_size_bytes: int = Field(
+        default=8 * 1024 * 1024,
+        description="Maximum WebSocket message size for camera images",
+    )
+    output_queue_size: int = Field(
+        default=256,
+        description="Per-output-connection queue size before old chunks are dropped",
+    )
+    ping_interval_secs: float | None = 20.0
+    ping_timeout_secs: float | None = 20.0
+    close_timeout_secs: float = 1.0
+
+
 class AppConfig(BaseModel):
     """Root configuration aggregating all sub-sections."""
 
@@ -193,6 +222,7 @@ class AppConfig(BaseModel):
     tts: TtsConfig = TtsConfig()
     aed: AedConfig = AedConfig()
     audio: AudioConfig = AudioConfig()
+    firefly: FireflyConfig = FireflyConfig()
 
 
 # ---------------------------------------------------------------------------

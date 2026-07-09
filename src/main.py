@@ -36,7 +36,7 @@ load_dotenv()
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Voice Chatbot — Pipecat ASR-LLM-TTS")
     p.add_argument("-c", "--config", default="config.yaml", help="YAML config path")
-    p.add_argument("--transport", choices=["local", "websocket"],
+    p.add_argument("--transport", choices=["local", "websocket", "firefly"],
                    help="Override transport mode from config")
     p.add_argument("--dump-config", metavar="PATH", help="Write default config and exit")
     p.add_argument("--log-level", default="INFO",
@@ -75,7 +75,35 @@ async def run_pipeline(config: AppConfig) -> None:
     # ------------------------------------------------------------------
     # Transport
     # ------------------------------------------------------------------
-    if config.pipeline.transport == "websocket":
+    if config.pipeline.transport == "firefly":
+        from src.transports.firefly import FireflyTransport, FireflyTransportParams
+
+        transport_params = FireflyTransportParams(
+            audio_in_enabled=True,
+            audio_out_enabled=True,
+            video_in_enabled=True,
+            audio_in_sample_rate=config.audio.input_sample_rate,
+            audio_out_sample_rate=config.firefly.output_sample_rate,
+            audio_in_channels=config.firefly.input_channels,
+            audio_out_channels=config.firefly.output_channels,
+            client_audio_in_sample_rate=config.firefly.input_sample_rate,
+            client_audio_out_sample_rate=config.firefly.output_sample_rate,
+            image_width=config.firefly.image_width,
+            image_height=config.firefly.image_height,
+            image_format=config.firefly.image_format,
+            max_message_size_bytes=config.firefly.max_message_size_bytes,
+            output_queue_size=config.firefly.output_queue_size,
+            ping_interval_secs=config.firefly.ping_interval_secs,
+            ping_timeout_secs=config.firefly.ping_timeout_secs,
+            close_timeout_secs=config.firefly.close_timeout_secs,
+        )
+        transport = FireflyTransport(
+            params=transport_params,
+            host=config.pipeline.host,
+            port=config.pipeline.port,
+        )
+
+    elif config.pipeline.transport == "websocket":
         from src.serializers.multimodal import MultimodalFrameSerializer
         from pipecat.transports.websocket.server import (
             SingleClientWebsocketServerTransport,
@@ -255,6 +283,10 @@ async def run_pipeline(config: AppConfig) -> None:
     if config.pipeline.transport == "websocket":
         logger.info(
             f"WebSocket server → ws://{config.pipeline.host}:{config.pipeline.port}"
+        )
+    elif config.pipeline.transport == "firefly":
+        logger.info(
+            f"Firefly WebSocket server → ws://{config.pipeline.host}:{config.pipeline.port}"
         )
     if enabled_features:
         logger.info(f"VAD features | {', '.join(enabled_features)} | "

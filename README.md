@@ -59,13 +59,14 @@ Or use any model that vLLM-Omni supports (CosyVoice3, Qwen3-TTS, etc.).
 python -m src.main
 ```
 
-Speak into your microphone. Press `Ctrl+C` to stop.
+With the checked-in config this starts the Firefly WebSocket adapter. Use
+`--transport local` for local microphone/speaker testing. Press `Ctrl+C` to stop.
 
 ## Configuration Reference
 
 | Section | Key | Default | Description |
 |---------|-----|---------|-------------|
-| `pipeline` | `transport` | `local` | `local` for mic/speaker, `websocket` for remote |
+| `pipeline` | `transport` | `firefly` | `local` for mic/speaker, `websocket` for Pipecat protobuf, `firefly` for the Android client |
 | `vad` | `start_secs` | `0.2` | Speech duration before activation |
 | `vad` | `stop_secs` | `0.3` | Silence before end-of-speech |
 | `asr` | `device` | `cuda` | `cuda` or `cpu` |
@@ -78,6 +79,8 @@ Speak into your microphone. Press `Ctrl+C` to stop.
 | `tts` | `ref_text` | `null` | Transcript of reference audio |
 | `aed` | `enabled` | `true` | Enable environmental sound detection |
 | `aed` | `include_in_context` | `true` | Inject events into LLM context |
+| `firefly` | `input_sample_rate` | `32000` | Android `/microphone` raw PCM16 mono input rate |
+| `firefly` | `output_sample_rate` | `44100` | Android `/audio` raw PCM16 mono playback rate |
 
 ## Environmental Sound Detection
 
