@@ -10,6 +10,7 @@ with both text and image_url parts.
 
 from typing import Optional
 
+from loguru import logger
 from pipecat.frames.frames import (
     Frame,
     InputImageRawFrame,
@@ -82,8 +83,9 @@ class ContentConcatenator(FrameProcessor):
             await self.push_frame(frame, direction)
 
         elif isinstance(frame, TranscriptionFrame):
-            if self._speaking and frame.text:
+            if frame.text:
                 self._turn_text = frame.text
+                await self._finalize_turn()
             # Consume ASR text here. TranscriptionFrame is a TextFrame subclass;
             # forwarding it would let downstream TTS speak the user's words.
             return
@@ -102,7 +104,8 @@ class ContentConcatenator(FrameProcessor):
 
         elif isinstance(frame, VADUserStoppedSpeakingFrame):
             self._speaking = False
-            await self._finalize_turn()
+            if self._turn_text.strip():
+                await self._finalize_turn()
             await self.push_frame(frame, direction)
 
         elif isinstance(frame, TextFrame):
@@ -171,4 +174,7 @@ class ContentConcatenator(FrameProcessor):
 
         messages = [self._system] + list(self._history)
         context = LLMContext(messages=messages)
+        logger.info(f"LLM context <- \"{text[:80]}\"")
         await self.push_frame(LLMContextFrame(context=context))
+        self._turn_text = ""
+        self._turn_aed = []

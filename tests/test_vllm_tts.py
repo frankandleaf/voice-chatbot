@@ -62,3 +62,9 @@ def test_tts_uses_configured_speech_url_and_auth_header():
 
     assert service._speech_url == "http://localhost:8091/v1/audio/speech"
     assert service._headers["Authorization"] == "Bearer secret-token"
+
+
+def test_tts_adds_v1_when_base_url_is_server_root():
+    service = VLLMTTSService(TtsConfig(base_url="http://localhost:8091"))
+
+    assert service._speech_url == "http://localhost:8091/v1/audio/speech"

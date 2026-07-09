@@ -64,7 +64,7 @@ class VLLMTTSService(FrameProcessor):
 
         await self._pre_warm()
         logger.info(
-            f"VLLMTTSService ready | {self._config.base_url} | {self._config.model}"
+            f"VLLMTTSService ready | {self._config.base_url} | model configured"
         )
 
     async def cleanup(self):
@@ -193,7 +193,10 @@ class VLLMTTSService(FrameProcessor):
 
     @property
     def _speech_url(self) -> str:
-        return str(self._config.base_url).rstrip("/") + "/audio/speech"
+        base_url = str(self._config.base_url).rstrip("/")
+        if base_url.endswith("/v1"):
+            return base_url + "/audio/speech"
+        return base_url + "/v1/audio/speech"
 
     @property
     def _headers(self) -> dict[str, str]:

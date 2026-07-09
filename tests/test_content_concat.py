@@ -4,8 +4,10 @@ import pytest
 
 from pipecat.frames.frames import (
     InterimTranscriptionFrame,
+    LLMContextFrame,
     TranscriptionFrame,
     VADUserStartedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
 )
 
 from src.config import AedConfig, LlmConfig
@@ -82,4 +84,27 @@ class TestContentConcatenator:
 
         assert not any(isinstance(frame, TranscriptionFrame) for frame in pushed)
         assert not any(isinstance(frame, InterimTranscriptionFrame) for frame in pushed)
-        assert cc._turn_text == "hello"
+        assert any(isinstance(frame, LLMContextFrame) for frame in pushed)
+        assert cc._turn_text == ""
+
+    @pytest.mark.anyio
+    async def test_transcription_after_vad_stop_still_triggers_llm(self):
+        """Segmented STT can emit the final transcription after VAD stop."""
+        cc = ContentConcatenator(LlmConfig())
+        pushed = []
+
+        async def capture(frame, direction=None):
+            pushed.append(frame)
+
+        cc.push_frame = capture
+
+        await cc.process_frame(VADUserStartedSpeakingFrame(), None)
+        await cc.process_frame(VADUserStoppedSpeakingFrame(), None)
+        await cc.process_frame(
+            TranscriptionFrame(text="after stop", user_id="user", timestamp="1"),
+            None,
+        )
+
+        contexts = [frame for frame in pushed if isinstance(frame, LLMContextFrame)]
+        assert len(contexts) == 1
+        assert contexts[0].context.messages[-1]["content"] == "after stop"
