@@ -367,6 +367,10 @@ class FireflyOutputTransport(BaseOutputTransport):
         super().__init__(params, **kwargs)
         self._registry = registry
 
+    async def start(self, frame: StartFrame):
+        await super().start(frame)
+        await self.set_transport_ready(frame)
+
     async def write_audio_frame(self, frame: OutputAudioRawFrame) -> bool:
         if not frame.audio:
             return True

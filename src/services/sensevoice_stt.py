@@ -25,7 +25,7 @@ from pipecat.frames.frames import (
     VADUserStartedSpeakingFrame,
     VADUserStoppedSpeakingFrame,
 )
-from pipecat.services.stt_service import SegmentedSTTService
+from pipecat.services.stt_service import STTSettings, SegmentedSTTService
 
 from src.config import AsrConfig
 
@@ -96,7 +96,12 @@ class SenseVoiceSTTService(SegmentedSTTService):
     """
 
     def __init__(self, config: AsrConfig, **kwargs):
-        super().__init__(sample_rate=config.sample_rate, **kwargs)
+        super().__init__(
+            sample_rate=config.sample_rate,
+            settings=STTSettings(model=config.model, language=None),
+            ttfs_p99_latency=1.0,
+            **kwargs,
+        )
         self._config = config
         self._model = None
 
