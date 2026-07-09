@@ -78,7 +78,7 @@ llm:
 tts:
   provider: "vllm-omni"
   base_url: "${TTS_BASE_URL}"
-  api_key: "${LLM_API_KEY}"
+  api_key: "${TTS_API_KEY}"
   model: "${TTS_MODEL}"
   voice: "firefly"
   speed: 1.0

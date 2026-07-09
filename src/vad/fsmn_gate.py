@@ -124,7 +124,7 @@ class FsmnVadGate(FrameProcessor):
             loop = asyncio.get_running_loop()
             result = await loop.run_in_executor(
                 None,
-                lambda: self._model.generate(input=arr),
+                lambda: self._model.generate(input=arr, disable_pbar=True),
             )
             if result and len(result) > 0 and "text" in result[0]:
                 # fsmn-vad returns speech segments; empty means no speech detected
@@ -152,6 +152,7 @@ class FsmnVadGate(FrameProcessor):
                 lambda: AutoModel(
                     model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
                     device=self._device,
+                    disable_pbar=True,
                     disable_progress_bar=True,
                     disable_log=True,
                 ),

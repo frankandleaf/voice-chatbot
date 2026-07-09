@@ -2,6 +2,12 @@
 
 import pytest
 
+from pipecat.frames.frames import (
+    InterimTranscriptionFrame,
+    TranscriptionFrame,
+    VADUserStartedSpeakingFrame,
+)
+
 from src.config import AedConfig, LlmConfig
 from src.processors.content_concat import ContentConcatenator
 
@@ -52,3 +58,28 @@ class TestContentConcatenator:
         aed_config = AedConfig(enabled=False)
         cc = ContentConcatenator(llm_config, aed_config)
         assert cc._aed.enabled is False
+
+    @pytest.mark.anyio
+    async def test_transcription_frames_are_consumed_before_tts(self):
+        """ASR text frames are TextFrame subclasses but must not reach TTS."""
+        cc = ContentConcatenator(LlmConfig())
+        pushed = []
+
+        async def capture(frame, direction=None):
+            pushed.append(frame)
+
+        cc.push_frame = capture
+
+        await cc.process_frame(VADUserStartedSpeakingFrame(), None)
+        await cc.process_frame(
+            TranscriptionFrame(text="hello", user_id="user", timestamp="1"),
+            None,
+        )
+        await cc.process_frame(
+            InterimTranscriptionFrame(text="hello", user_id="user", timestamp="1"),
+            None,
+        )
+
+        assert not any(isinstance(frame, TranscriptionFrame) for frame in pushed)
+        assert not any(isinstance(frame, InterimTranscriptionFrame) for frame in pushed)
+        assert cc._turn_text == "hello"

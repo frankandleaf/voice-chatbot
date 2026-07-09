@@ -38,3 +38,27 @@ def test_tts_chunks_use_configured_sample_rate():
     chunks = list(service._chunks(pcm))
 
     assert [len(chunk) for chunk in chunks] == [960, 960, 80]
+
+
+def test_tts_body_matches_qwen_speech_api():
+    service = VLLMTTSService(TtsConfig(response_format="wav", speed=1.0))
+
+    body = service._build_body("hello")
+
+    assert body == {
+        "model": "fishaudio/s2-pro",
+        "input": "hello",
+        "voice": "default",
+        "speed": 1.0,
+    }
+    assert "response_format" not in body
+
+
+def test_tts_uses_configured_speech_url_and_auth_header():
+    service = VLLMTTSService(TtsConfig(
+        base_url="http://localhost:8091/v1/",
+        api_key="secret-token",
+    ))
+
+    assert service._speech_url == "http://localhost:8091/v1/audio/speech"
+    assert service._headers["Authorization"] == "Bearer secret-token"

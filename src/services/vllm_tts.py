@@ -17,8 +17,8 @@ from collections.abc import AsyncGenerator, Iterable
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from loguru import logger
-from openai import AsyncOpenAI
 from pipecat.frames.frames import (
     CancelFrame,
     EndFrame,
@@ -40,8 +40,8 @@ class VLLMTTSService(FrameProcessor):
     def __init__(self, config: TtsConfig, **kwargs):
         super().__init__(**kwargs)
         self._config = config
-        self._client: Optional[AsyncOpenAI] = None
-        self._ref_audio_base64: Optional[str] = None
+        self._client: Optional[httpx.AsyncClient] = None
+        self._ref_audio_bytes: Optional[bytes] = None
 
     @property
     def _chunk_size_bytes(self) -> int:
@@ -51,16 +51,13 @@ class VLLMTTSService(FrameProcessor):
         if self._client:
             return
 
-        self._client = AsyncOpenAI(
-            base_url=str(self._config.base_url),
-            api_key=self._config.api_key,
-        )
+        self._client = httpx.AsyncClient(timeout=None)
 
         if self._config.ref_audio_path:
             ref_path = Path(self._config.ref_audio_path)
             if ref_path.exists():
                 with open(ref_path, "rb") as f:
-                    self._ref_audio_base64 = base64.b64encode(f.read()).decode()
+                    self._ref_audio_bytes = f.read()
                 logger.info(f"Ref audio loaded: {ref_path}")
             else:
                 logger.warning(f"Ref audio not found: {ref_path}")
@@ -74,7 +71,7 @@ class VLLMTTSService(FrameProcessor):
         if self._client:
             await self._client.close()
         self._client = None
-        self._ref_audio_base64 = None
+        self._ref_audio_bytes = None
         await super().cleanup()
 
     async def run_tts(self, text: str, context_id: str) -> AsyncGenerator[Frame | None, None]:
@@ -154,7 +151,13 @@ class VLLMTTSService(FrameProcessor):
     ) -> AsyncGenerator[TTSAudioRawFrame, None]:
         assert self._client is not None
 
-        async with self._client.audio.speech.with_streaming_response.create(**body) as response:
+        async with self._client.stream(
+            "POST",
+            self._speech_url,
+            headers=self._headers,
+            json=body,
+        ) as response:
+            response.raise_for_status()
             if self._config.response_format.lower() == "wav":
                 wav_bytes = bytearray()
                 async for chunk in response.iter_bytes(self._chunk_size_bytes):
@@ -176,12 +179,29 @@ class VLLMTTSService(FrameProcessor):
     ) -> AsyncGenerator[TTSAudioRawFrame, None]:
         assert self._client is not None
 
-        response = await self._client.audio.speech.create(**body)
+        response = await self._client.post(
+            self._speech_url,
+            headers=self._headers,
+            json=body,
+        )
+        response.raise_for_status()
         if not response.content:
             return
 
         for chunk in self._pcm_chunks_from_response(response.content):
             yield self._audio_frame(chunk, context_id=context_id)
+
+    @property
+    def _speech_url(self) -> str:
+        return str(self._config.base_url).rstrip("/") + "/audio/speech"
+
+    @property
+    def _headers(self) -> dict[str, str]:
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        api_key = self._config.api_key.strip()
+        if api_key and api_key != "not-needed":
+            headers["Authorization"] = f"Bearer {api_key}"
+        return headers
 
     def _build_body(self, text: str) -> dict:
         body: dict = {
@@ -189,10 +209,9 @@ class VLLMTTSService(FrameProcessor):
             "input": text,
             "voice": self._config.voice,
             "speed": self._config.speed,
-            "response_format": self._config.response_format,
         }
-        if self._ref_audio_base64:
-            body["ref_audio"] = self._ref_audio_base64
+        if self._ref_audio_bytes:
+            body["ref_audio"] = base64.b64encode(self._ref_audio_bytes).decode()
         if self._config.ref_text:
             body["ref_text"] = self._config.ref_text
         return body
@@ -231,7 +250,12 @@ class VLLMTTSService(FrameProcessor):
             return
 
         try:
-            await self._client.audio.speech.create(**self._build_body("Hello."))
+            response = await self._client.post(
+                self._speech_url,
+                headers=self._headers,
+                json=self._build_body("Hello."),
+            )
+            response.raise_for_status()
             logger.info("TTS pre-warm complete")
         except Exception as exc:
             logger.warning(f"TTS pre-warm failed (non-fatal): {exc}")

@@ -84,11 +84,13 @@ class ContentConcatenator(FrameProcessor):
         elif isinstance(frame, TranscriptionFrame):
             if self._speaking and frame.text:
                 self._turn_text = frame.text
-            await self.push_frame(frame, direction)
+            # Consume ASR text here. TranscriptionFrame is a TextFrame subclass;
+            # forwarding it would let downstream TTS speak the user's words.
+            return
 
         elif isinstance(frame, InterimTranscriptionFrame):
-            # Pass through for display — does not affect context building
-            await self.push_frame(frame, direction)
+            # Interim ASR is only for local diagnostics/display, not LLM/TTS input.
+            return
 
         elif isinstance(frame, EnvironmentalSoundFrame):
             if self._speaking and self._aed.enabled:
@@ -96,7 +98,7 @@ class ContentConcatenator(FrameProcessor):
                     "type": frame.sound_type,
                     "confidence": frame.confidence,
                 })
-            await self.push_frame(frame, direction)
+            return
 
         elif isinstance(frame, VADUserStoppedSpeakingFrame):
             self._speaking = False

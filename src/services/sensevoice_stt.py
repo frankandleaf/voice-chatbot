@@ -123,6 +123,7 @@ class SenseVoiceSTTService(SegmentedSTTService):
                 model=self._config.model,
                 vad_model=self._config.vad_model,
                 device=self._config.device,
+                disable_pbar=True,
                 disable_progress_bar=True,
                 disable_log=True,
             ),
@@ -279,6 +280,7 @@ class SenseVoiceSTTService(SegmentedSTTService):
                     input=arr,
                     language="auto",
                     use_itn=self._config.use_itn,
+                    disable_pbar=True,
                 ),
             )
         except Exception as exc:
