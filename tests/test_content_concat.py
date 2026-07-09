@@ -24,12 +24,11 @@ class TestContentConcatenator:
         assert cc._turn_text == ""
         assert cc._turn_aed == []
         assert cc._speaking is False
-        assert len(cc._history) == 0
 
     def test_no_local_history_is_kept(self):
         """History lives in the upstream LLM service, not this processor."""
         cc = ContentConcatenator(LlmConfig())
-        assert cc._history == []
+        assert not hasattr(cc, "_history")
 
     def test_aed_disabled(self):
         """When AED is disabled, events should not be collected."""
@@ -111,4 +110,4 @@ class TestContentConcatenator:
             [{"role": "user", "content": "first"}],
             [{"role": "user", "content": "second"}],
         ]
-        assert cc._history == []
+        assert not hasattr(cc, "_history")

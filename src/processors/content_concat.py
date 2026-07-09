@@ -1,4 +1,4 @@
-"""Content concatenation + conversation history for Pipecat 1.4+.
+"""Content concatenation for Pipecat 1.4+.
 
 Collects ``TranscriptionFrame`` results across a turn, concatenates on
 ``VADUserStoppedSpeakingFrame``, and emits ``LLMContextFrame`` for the LLM.
@@ -33,8 +33,8 @@ class ContentConcatenator(FrameProcessor):
     """Aggregate partial transcripts → complete utterance → LLM context.
 
     Sits between ASR and LLM.  On end-of-speech it builds the full user
-    message (optionally annotated with AED events and image), manages
-    conversation history, and emits ``LLMContextFrame``.
+    message (optionally annotated with AED events and image), and emits
+    ``LLMContextFrame``.
 
     When ``LlmConfig.supports_vision`` is True and an image frame is
     available, the user message is built as a multimodal OpenAI content
@@ -54,10 +54,6 @@ class ContentConcatenator(FrameProcessor):
         # Multimodal state
         self._latest_image_frame: Optional[InputImageRawFrame] = None
         self._image_sent: bool = False
-
-        # No local conversation history: the upstream LLM service is stateful.
-        # Each request must contain exactly the latest user turn.
-        self._history: list[dict] = []
 
     # ------------------------------------------------------------------
     # Frame processing

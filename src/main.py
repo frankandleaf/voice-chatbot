@@ -75,7 +75,6 @@ async def run_pipeline(config: AppConfig) -> None:
     from pipecat.pipeline.runner import PipelineRunner
     from pipecat.pipeline.task import PipelineParams, PipelineTask
     from pipecat.processors.audio.vad_processor import VADProcessor
-    from pipecat.services.openai.llm import OpenAILLMService
     from pipecat.transports.local.audio import (
         LocalAudioTransport,
         LocalAudioTransportParams,
@@ -85,6 +84,7 @@ async def run_pipeline(config: AppConfig) -> None:
     from src.processors.content_concat import ContentConcatenator
     from src.processors.image_collector import ImageCollector
     from src.services.sensevoice_stt import SenseVoiceSTTService
+    from src.services.stateful_llm import StatefulOpenAILLMService
     from src.services.vllm_tts import VLLMTTSService
     from src.vad.adaptive_noise import AdaptiveNoiseTracker
     from src.vad.aed_suppressor import AedSuppressor
@@ -222,10 +222,11 @@ async def run_pipeline(config: AppConfig) -> None:
     # ------------------------------------------------------------------
     # LLM: OpenAI-compatible
     # ------------------------------------------------------------------
-    llm = OpenAILLMService(
+    llm = StatefulOpenAILLMService(
+        stateful_config=config.llm,
         api_key=config.llm.api_key,
         base_url=config.llm.base_url,
-        settings=OpenAILLMService.Settings(
+        settings=StatefulOpenAILLMService.Settings(
             model=config.llm.model,
             temperature=config.llm.temperature,
             max_tokens=config.llm.max_tokens,

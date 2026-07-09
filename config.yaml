@@ -71,6 +71,9 @@ llm:
   model: "${LLM_MODEL}"
   temperature: 0.7
   max_tokens: 512
+  device_name: "${LLM_DEVICE_NAME}" # user/session id becomes app_<device_name>
+  headless: false
+  stream: false
   system_prompt: "You are a helpful voice assistant. Keep responses short and conversational. If you hear background sounds like music or laughter, acknowledge them naturally."
   max_history_rounds: 20
   supports_vision: true     # Enable multimodal (image + text) input

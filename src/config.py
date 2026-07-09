@@ -119,6 +119,12 @@ class LlmConfig(BaseModel):
     temperature: float = 0.7
     max_tokens: int = 512
     top_p: float = 1.0
+    device_name: str = Field(
+        default="firefly",
+        description="User device name used to build app_<device> user/session ids",
+    )
+    headless: bool = False
+    stream: bool = False
     system_prompt: str = "You are a helpful voice assistant. Keep responses concise and conversational."
     max_history_rounds: int = Field(
         default=20, description="Maximum number of conversation turns to keep"
@@ -128,6 +134,11 @@ class LlmConfig(BaseModel):
         description="Whether the model supports vision (multimodal) input. "
                     "When True, images from transport are included in LLM context.",
     )
+
+    @model_validator(mode="after")
+    def _default_device_name(self):
+        self.device_name = self.device_name.strip() or "firefly"
+        return self
 
 
 class TtsConfig(BaseModel):
