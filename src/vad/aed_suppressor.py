@@ -99,6 +99,11 @@ class AedSuppressor(FrameProcessor):
     # ------------------------------------------------------------------
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartFrame):
+            self._sample_rate = frame.audio_in_sample_rate
+
         # BotSpeakingFrame flows upstream from TTS — track whether bot is
         # producing audio so we can suppress VAD barge-in on non-speech events.
         if isinstance(frame, BotSpeakingFrame):
@@ -121,22 +126,24 @@ class AedSuppressor(FrameProcessor):
                     f"for {self._suppression_ms}ms"
                 )
 
-        # Emit suppression status
-        now = time.monotonic()
-        if self._suppressed_until > now:
-            await self.push_frame(AedSuppressFrame(
-                suppressed=True,
-                event_type=self._current_event,
-                confidence=0.8,
-            ))
-        elif self._chunk_count % 10 == 0:
-            await self.push_frame(AedSuppressFrame(
-                suppressed=False,
-                event_type="",
-                confidence=0.0,
-            ))
+            # Emit suppression status only alongside audio frames. Emitting
+            # data frames before StartFrame reaches downstream processors can
+            # break Pipecat's lifecycle ordering.
+            now = time.monotonic()
+            if self._suppressed_until > now:
+                await self.push_frame(AedSuppressFrame(
+                    suppressed=True,
+                    event_type=self._current_event,
+                    confidence=0.8,
+                ))
+            elif self._chunk_count % 10 == 0:
+                await self.push_frame(AedSuppressFrame(
+                    suppressed=False,
+                    event_type="",
+                    confidence=0.0,
+                ))
+            self._chunk_count += 1
 
-        self._chunk_count += 1
         await self.push_frame(frame, direction)
 
     # ------------------------------------------------------------------

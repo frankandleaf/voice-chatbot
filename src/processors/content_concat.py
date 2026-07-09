@@ -67,6 +67,8 @@ class ContentConcatenator(FrameProcessor):
     # ------------------------------------------------------------------
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
         if isinstance(frame, InputImageRawFrame):
             self._latest_image_frame = frame
             # Don't push downstream — consumed in _finalize_turn()

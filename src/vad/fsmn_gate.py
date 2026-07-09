@@ -65,16 +65,8 @@ class FsmnVadGate(FrameProcessor):
     # ------------------------------------------------------------------
 
     async def start(self, frame: StartFrame):
-        from funasr import AutoModel
-
         self._sample_rate = frame.audio_in_sample_rate
-        self._model = AutoModel(
-            model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
-            device=self._device,
-            disable_progress_bar=True,
-            disable_log=True,
-        )
-        logger.info(f"FsmnVadGate loaded | device={self._device}")
+        await self._load_model()
 
     async def cleanup(self):
         self._model = None
@@ -84,6 +76,13 @@ class FsmnVadGate(FrameProcessor):
     # ------------------------------------------------------------------
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartFrame):
+            self._sample_rate = frame.audio_in_sample_rate
+            if self._model is None:
+                await self._load_model()
+
         # Track noise floor
         if isinstance(frame, NoiseFloorFrame):
             self._noise_floor_rms = frame.rms_noise_floor
@@ -140,6 +139,27 @@ class FsmnVadGate(FrameProcessor):
             logger.debug(f"fsmn-vad inference error: {exc}")
 
         return True  # On error, let through
+
+    async def _load_model(self) -> None:
+        try:
+            import asyncio
+
+            from funasr import AutoModel
+
+            loop = asyncio.get_running_loop()
+            self._model = await loop.run_in_executor(
+                None,
+                lambda: AutoModel(
+                    model="iic/speech_fsmn_vad_zh-cn-16k-common-pytorch",
+                    device=self._device,
+                    disable_progress_bar=True,
+                    disable_log=True,
+                ),
+            )
+            logger.info(f"FsmnVadGate loaded | device={self._device}")
+        except Exception as exc:
+            self._model = None
+            logger.warning(f"FsmnVadGate disabled; model load failed: {exc}")
 
     @property
     def is_in_non_speech_burst(self) -> bool:

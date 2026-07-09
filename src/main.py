@@ -21,6 +21,7 @@ Usage::
 
 import argparse
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -31,6 +32,24 @@ from src.config import AppConfig, load_config, save_default_config
 from src.utils.logging import setup_logging
 
 load_dotenv()
+
+
+def isolate_nltk_data_path() -> None:
+    """Keep Pipecat's NLTK imports away from corrupt global NLTK data."""
+    try:
+        import nltk
+    except Exception as exc:
+        logger.warning(f"Could not import NLTK before Pipecat setup: {exc}")
+        return
+
+    data_dir = Path(
+        os.getenv(
+            "VOICE_CHATBOT_NLTK_DATA",
+            Path.home() / ".cache" / "voice-chatbot" / "nltk_data",
+        )
+    )
+    data_dir.mkdir(parents=True, exist_ok=True)
+    nltk.data.path[:] = [str(data_dir)]
 
 
 def parse_args() -> argparse.Namespace:
@@ -311,6 +330,7 @@ def main() -> None:
         return
 
     setup_logging(level=args.log_level)
+    isolate_nltk_data_path()
 
     config_path = Path(args.config)
     try:

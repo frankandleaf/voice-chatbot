@@ -23,6 +23,8 @@ class AedFormatter(FrameProcessor):
         self._recent: deque[EnvironmentalSoundFrame] = deque(maxlen=20)
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
         if isinstance(frame, EnvironmentalSoundFrame) and self._config.enabled:
             self._recent.append(frame)
             desc = self._config.event_mappings.get(

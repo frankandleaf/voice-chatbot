@@ -111,12 +111,16 @@ class SenseVoiceSTTService(SegmentedSTTService):
     async def start(self, frame):
         from funasr import AutoModel
 
-        self._model = AutoModel(
-            model=self._config.model,
-            vad_model=self._config.vad_model,
-            device=self._config.device,
-            disable_progress_bar=True,
-            disable_log=True,
+        loop = asyncio.get_running_loop()
+        self._model = await loop.run_in_executor(
+            None,
+            lambda: AutoModel(
+                model=self._config.model,
+                vad_model=self._config.vad_model,
+                device=self._config.device,
+                disable_progress_bar=True,
+                disable_log=True,
+            ),
         )
         logger.info(
             f"SenseVoiceSmall loaded | device={self._config.device} "

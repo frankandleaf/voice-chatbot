@@ -69,13 +69,18 @@ class AdaptiveNoiseTracker(FrameProcessor):
         self._sample_rate = frame.audio_in_sample_rate
         # Each RMS measurement covers ~100 ms
         self._max_samples = int(self._window_secs / 0.1)
-        await super().start(frame)
 
     # ------------------------------------------------------------------
     # Frame processing
     # ------------------------------------------------------------------
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, StartFrame):
+            self._sample_rate = frame.audio_in_sample_rate
+            self._max_samples = int(self._window_secs / 0.1)
+
         if isinstance(frame, AudioRawFrame):
             rms = self._compute_rms(frame)
             if rms is not None:

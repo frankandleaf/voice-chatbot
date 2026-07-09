@@ -29,6 +29,8 @@ class ImageCollector(FrameProcessor):
         self._user_speaking: bool = False
 
     async def process_frame(self, frame: Frame, direction: FrameDirection):
+        await super().process_frame(frame, direction)
+
         if isinstance(frame, InputImageRawFrame):
             self._latest_image = frame
             # Don't push downstream yet — wait for end-of-speech

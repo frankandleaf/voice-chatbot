@@ -231,7 +231,7 @@ class VLLMTTSService(FrameProcessor):
             return
 
         try:
-            await self._client.audio.speech.create(**self._build_body(" "))
+            await self._client.audio.speech.create(**self._build_body("Hello."))
             logger.info("TTS pre-warm complete")
         except Exception as exc:
             logger.warning(f"TTS pre-warm failed (non-fatal): {exc}")
